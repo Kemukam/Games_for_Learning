@@ -1,0 +1,247 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tooth Matching Game</title>
+<style>
+  body {
+    font-family: 'Comic Sans MS', cursive, sans-serif; /* FIX: COMIC SANS FONT */
+    font-weight: bold; /* FIX: BOLD FONT */
+    font-size: 20px; /* FIX: BIGGER FONT */
+    text-align: center;
+    background: #f8f8f8;
+    margin: 0;
+    padding: 0;
+  }
+
+  h1 {
+    margin: 20px 0;
+  }
+
+  #game-board {
+    display: grid;
+    grid-template-columns: repeat(4, 120px);
+    grid-gap: 15px;
+    justify-content: center;
+    margin-top: 30px;
+  }
+
+  .card {
+    width: 120px;
+    height: 160px;
+    perspective: 1000px;
+    cursor: pointer;
+  }
+
+  .card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.6s;
+    transform-style: preserve-3d;
+  }
+
+  .card.flipped .card-inner {
+    transform: rotateY(180deg);
+  }
+
+  .card-front, .card-back {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    border: 2px solid #333;
+    backface-visibility: hidden; /* FIX: PREVENT MIRRORED TEXT */
+    -webkit-backface-visibility: hidden; /* FIX: SAFARI SUPPORT */
+  }
+
+  .card-back {
+    transform: rotateY(180deg); /* FIX: MAKE BACK ONLY SHOW WHEN FLIPPED */
+    background: white;
+  }
+
+  /* FIX: CARD COLORS — ONE OF EACH PER ROW */
+  .color-green { background: #7CFC00; }
+  .color-pink { background: #FF69B4; }
+  .color-blue { background: #1E90FF; }
+  .color-purple { background: #9370DB; }
+
+  /* FIX: MATCH OUTLINE */
+  .matched {
+    border: 4px solid yellow;
+  }
+
+  /* SPARKLY STAR ANIMATION FIX */
+  @keyframes sparkle {
+    0% { transform: scale(1) rotate(0deg); opacity: 1; }
+    50% { transform: scale(1.3) rotate(20deg); opacity: 0.8; }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  }
+
+  #star-message {
+    display: none;
+    position: fixed;
+    top: 40%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 36px;
+    color: gold;
+    text-shadow: 0 0 10px white;
+    z-index: 1000;
+  }
+
+  #star-image {
+    width: 100px;
+    height: 100px;
+    animation: sparkle 1s infinite;
+  }
+</style>
+</head>
+<body>
+
+<h1>Dentition Matching Game</h1>
+<div id="game-board"></div>
+
+<div id="star-message">
+  <img id="star-image" src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Star_icon-72a7cf.svg/1024px-Star_icon-72a7cf.svg.png" alt="Star"><br>
+  You're awesome!
+</div>
+
+<script>
+const allTeeth = [
+  ["1", "U.R. Wisdom Tooth (3rd Molar)"],
+  ["2", "U.R. Molar (2nd Molar)"],
+  ["3", "U.R. Molar (1st Molar)"],
+  ["4", "U.R. Bicuspid (2nd)"],
+  ["5", "U.R. Bicuspid (1st)"],
+  ["6", "U.R. Canine (Cuspid)"],
+  ["7", "U.R. Lateral Incisor"],
+  ["8", "U.R. Central Incisor"],
+  ["9", "U.L. Central Incisor)"],
+  ["10", "U.L. Lateral Incisor"],
+  ["11", "U.L.Canine (Cuspid)"],
+  ["12", "U.L. 1st Premolar (Bicuspid)"],
+  ["13", "U.L. 2nd Premolar (Bicuspid)"],
+  ["14", "U.L. Molar (1st)"],
+  ["15", "U.L. Molar (2nd)"],
+  ["16", "U.L. Wisdom Tooth (3rd Molar)"],
+  ["17", "L.L. Wisdom Tooth (3rd Molar)"],
+  ["18", "L.L. Molar (2nd Molar)"],
+  ["19", "L.L. Molar (1st Molar)"],
+  ["20", "L.L. 2nd Premolar (Bicuspid)"],
+  ["21", "L.L. 1st. Premolar (Bicuspid)"],
+  ["22", "L.L. Canine (Cuspid)"],
+  ["23", "L.L. Lateral Incisor"],
+  ["24", "L.L. Central Incisor"],
+  ["25", "L.R. Central Incisor"],
+  ["26", "L.R. Lateral Incisor"],
+  ["27", "L.R. Canine (Cuspid)"],
+  ["28", "L.R. 1st. Premolar (Bicuspid)"],
+  ["29", "L.R. 2nd Premolar (Bicuspid)"],
+  ["30", "L.R. Molar (1st Molar)"],
+  ["31", "L.R. Molar (2nd Molar)"],
+  ["32", "L.R. Wisdom Tooth (3rd Molar)"]
+];
+
+let lastRoundTeeth = [];
+let consecutivePerfectRounds = 0;
+
+function getRandomTeethSet() {
+  let availableTeeth = allTeeth.filter(t => !lastRoundTeeth.includes(t[0]));
+  if (availableTeeth.length < 16) availableTeeth = allTeeth; // reset if not enough new ones
+
+  const shuffled = [...availableTeeth].sort(() => 0.5 - Math.random());
+  const selected = shuffled.slice(0, 16);
+  lastRoundTeeth = selected.map(t => t[0]);
+  return selected;
+}
+
+function startGame() {
+  const selectedTeeth = getRandomTeethSet();
+  const pairs = selectedTeeth.flatMap(t => [
+    { type: 'number', value: t[0], match: t[1] },
+    { type: 'name', value: t[1], match: t[0] }
+  ]);
+
+  const shuffled = pairs.sort(() => 0.5 - Math.random());
+  const board = document.getElementById('game-board');
+  board.innerHTML = '';
+
+  const colors = ['color-green', 'color-pink', 'color-blue', 'color-purple'];
+
+  shuffled.forEach((cardData, index) => {
+    const card = document.createElement('div');
+    card.classList.add('card');
+
+    const inner = document.createElement('div');
+    inner.classList.add('card-inner');
+
+    const front = document.createElement('div');
+    front.classList.add('card-front', colors[index % 4]); // FIX: COLOR PER ROW
+    front.textContent = '';
+
+    const back = document.createElement('div');
+    back.classList.add('card-back');
+    back.textContent = cardData.value;
+
+    inner.appendChild(front);
+    inner.appendChild(back);
+    card.appendChild(inner);
+    board.appendChild(card);
+
+    card.addEventListener('click', () => flipCard(card, cardData));
+  });
+}
+
+let flippedCards = [];
+let matchedPairs = 0;
+
+function flipCard(card, data) {
+  if (flippedCards.length === 2 || card.classList.contains('flipped')) return;
+
+  card.classList.add('flipped');
+  flippedCards.push({ card, data });
+
+  if (flippedCards.length === 2) {
+    const [first, second] = flippedCards;
+    if (
+      (first.data.type === 'number' && second.data.type === 'name' && first.data.match === second.data.value) ||
+      (first.data.type === 'name' && second.data.type === 'number' && first.data.match === second.data.value)
+    ) {
+      first.card.classList.add('matched');
+      second.card.classList.add('matched');
+      matchedPairs++;
+
+      if (matchedPairs === 16) {
+        consecutivePerfectRounds++;
+        if (consecutivePerfectRounds === 3) {
+          showStar();
+          consecutivePerfectRounds = 0;
+        }
+        setTimeout(startGame, 1000);
+      }
+    } else {
+      setTimeout(() => {
+        first.card.classList.remove('flipped');
+        second.card.classList.remove('flipped');
+      }, 1000);
+    }
+    flippedCards = [];
+  }
+}
+
+function showStar() {
+  const star = document.getElementById('star-message');
+  star.style.display = 'block';
+  setTimeout(() => {
+    star.style.display = 'none';
+  }, 3000);
+}
+
+startGame();
+</script>
+</body>
+</html>
